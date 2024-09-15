@@ -6775,98 +6775,122 @@ class Series(base.IndexOpsMixin, NDFrame):  # type: ignore[misc]
             self, axis=axis, skipna=skipna, numeric_only=numeric_only, **kwargs
         )
 
-    @deprecate_nonkeyword_arguments(version="4.0", allowed_args=["self"], name="sum")
-    def sum(
-        self,
-        axis: Axis | None = None,
-        skipna: bool = True,
-        numeric_only: bool = False,
-        min_count: int = 0,
-        **kwargs,
-    ):
-        """
-        Return the sum of the values over the requested axis.
+    from typing import Optional, Union
 
-        This is equivalent to the method ``numpy.sum``.
+Axis = Union[int, str]  # 假设 Axis 类型定义
 
-        Parameters
-        ----------
-        axis : {index (0)}
-            Axis for the function to be applied on.
-            For `Series` this parameter is unused and defaults to 0.
+@deprecate_nonkeyword_arguments(version="4.0", allowed_args=["self"], name="sum")
+def sum(
+    self,
+    axis: Axis | None = None,
+    skipna: bool = True,
+    numeric_only: bool = False,
+    min_count: int = 0,
+    weights: Optional[Union[list, tuple, pd.Series]] = None,
+    **kwargs,
+):
+    """
+    Return the sum of the values over the requested axis.
 
-            .. warning::
+    This is equivalent to the method ``numpy.sum``.
 
-                The behavior of DataFrame.sum with ``axis=None`` is deprecated,
-                in a future version this will reduce over both axes and return a scalar
-                To retain the old behavior, pass axis=0 (or do not pass axis).
+    Parameters
+    ----------
+    axis : {index (0)}
+        Axis for the function to be applied on.
+        For `Series` this parameter is unused and defaults to 0.
 
-            .. versionadded:: 2.0.0
+        .. warning::
 
-        skipna : bool, default True
-            Exclude NA/null values when computing the result.
-        numeric_only : bool, default False
-            Include only float, int, boolean columns. Not implemented for Series.
+            The behavior of DataFrame.sum with ``axis=None`` is deprecated,
+            in a future version this will reduce over both axes and return a scalar
+            To retain the old behavior, pass axis=0 (or do not pass axis).
 
-        min_count : int, default 0
-            The required number of valid values to perform the operation. If fewer than
-            ``min_count`` non-NA values are present the result will be NA.
-        **kwargs
-            Additional keyword arguments to be passed to the function.
+        .. versionadded:: 2.0.0
 
-        Returns
-        -------
-        scalar or Series (if level specified)
-            Sum of the values for the requested axis.
+    skipna : bool, default True
+        Exclude NA/null values when computing the result.
+    numeric_only : bool, default False
+        Include only float, int, boolean columns. Not implemented for Series.
 
-        See Also
-        --------
-        numpy.sum : Equivalent numpy function for computing sum.
-        Series.mean : Mean of the values.
-        Series.median : Median of the values.
-        Series.std : Standard deviation of the values.
-        Series.var : Variance of the values.
-        Series.min : Minimum value.
-        Series.max : Maximum value.
+    min_count : int, default 0
+        The required number of valid values to perform the operation. If fewer than
+        ``min_count`` non-NA values are present the result will be NA.
+    weights : list, tuple, or Series, optional
+        Weights for each value in the Series or DataFrame. If provided, the sum will be
+        computed as a weighted sum.
+    **kwargs
+        Additional keyword arguments to be passed to the function.
 
-        Examples
-        --------
-        >>> idx = pd.MultiIndex.from_arrays(
-        ...     [["warm", "warm", "cold", "cold"], ["dog", "falcon", "fish", "spider"]],
-        ...     names=["blooded", "animal"],
-        ... )
-        >>> s = pd.Series([4, 2, 0, 8], name="legs", index=idx)
-        >>> s
-        blooded  animal
-        warm     dog       4
-                 falcon    2
-        cold     fish      0
-                 spider    8
-        Name: legs, dtype: int64
+    Returns
+    -------
+    scalar or Series (if level specified)
+        Sum of the values for the requested axis.
 
-        >>> s.sum()
-        14
+    See Also
+    --------
+    numpy.sum : Equivalent numpy function for computing sum.
+    Series.mean : Mean of the values.
+    Series.median : Median of the values.
+    Series.std : Standard deviation of the values.
+    Series.var : Variance of the values.
+    Series.min : Minimum value.
+    Series.max : Maximum value.
 
-        By default, the sum of an empty or all-NA Series is ``0``.
+    Examples
+    --------
+    >>> idx = pd.MultiIndex.from_arrays(
+    ...     [["warm", "warm", "cold", "cold"], ["dog", "falcon", "fish", "spider"]],
+    ...     names=["blooded", "animal"],
+    ... )
+    >>> s = pd.Series([4, 2, 0, 8], name="legs", index=idx)
+    >>> s
+    blooded  animal
+    warm     dog       4
+             falcon    2
+    cold     fish      0
+             spider    8
+    Name: legs, dtype: int64
 
-        >>> pd.Series([], dtype="float64").sum()  # min_count=0 is the default
-        0.0
+    >>> s.sum()
+    14
 
-        This can be controlled with the ``min_count`` parameter. For example, if
-        you'd like the sum of an empty series to be NaN, pass ``min_count=1``.
+    By default, the sum of an empty or all-NA Series is ``0``.
 
-        >>> pd.Series([], dtype="float64").sum(min_count=1)
-        nan
+    >>> pd.Series([], dtype="float64").sum()  # min_count=0 is the default
+    0.0
 
-        Thanks to the ``skipna`` parameter, ``min_count`` handles all-NA and
-        empty series identically.
+    This can be controlled with the ``min_count`` parameter. For example, if
+    you'd like the sum of an empty series to be NaN, pass ``min_count=1``.
 
-        >>> pd.Series([np.nan]).sum()
-        0.0
+    >>> pd.Series([], dtype="float64").sum(min_count=1)
+    nan
 
-        >>> pd.Series([np.nan]).sum(min_count=1)
-        nan
-        """
+    Using weights:
+
+    >>> s = pd.Series([1, 2, 3, 4])
+    >>> s.sum(weights=[0.5, 1, 1.5, 2])
+    17.0
+    """
+    if weights is not None:
+        if isinstance(weights, (list, tuple)):
+            weights = pd.Series(weights, index=self.index)
+        elif not isinstance(weights, pd.Series):
+            raise ValueError("Weights must be a list, tuple, or Series.")
+
+        if len(weights) != len(self):
+            raise ValueError("Length of weights does not match length of Series/DataFrame.")
+
+        # Apply weights
+        weighted_values = self * weights
+        return weighted_values.sum(
+            axis=axis,
+            skipna=skipna,
+            numeric_only=numeric_only,
+            min_count=min_count,
+            **kwargs,
+        )
+    else:
         return NDFrame.sum(
             self,
             axis=axis,
